@@ -127,7 +127,7 @@ public class ExcavationHandler {
             return false; // 超出服务器允许的范围
         }
 
-        BlockState state = client.world.getBlockState(pos);
+        BlockState state = Objects.requireNonNull(client.world).getBlockState(pos);
         if (!state.isAir() && state.getHardness(client.world, pos) >= 0) {
             currentMiningPos = pos;
             im.attackBlock(pos, Direction.UP);

@@ -2,7 +2,6 @@ package top.zspaces.assistExcavation.client.config.GUI;
 
 import net.fabricmc.api.Environment;
 import net.fabricmc.api.EnvType;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
@@ -143,7 +142,9 @@ public class AssistExcavationConfigScreen extends Screen {
     
     @Override
     public void close() {
-        this.client.setScreen(parent);
+        if (this.client != null) {
+            this.client.setScreen(parent);
+        }
     }
     
     @Override
