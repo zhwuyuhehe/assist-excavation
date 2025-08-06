@@ -6,7 +6,9 @@
   "description": "辅助左键挖掘目标方块",
   "authors": ["zhwuyuhehe"],
   "contact": {
-    "sources": "https://github.com/zhwuyuhehe"
+    "sources": "https://github.com/zhwuyuhehe/assist-excavation",
+    "issues": "https://github.com/zhwuyuhehe/assist-excavation/issues",
+    "email": "zhwuyuhehe@qq.com"
   },
   "license": "Apache-2.0",
   "icon": "assets/assist-excavation/favicon-Z.png",
