@@ -8,7 +8,7 @@
   "contact": {
     "sources": "https://github.com/zhwuyuhehe"
   },
-  "license": "All-Rights-Reserved",
+  "license": "Apache-2.0",
   "icon": "assets/assist-excavation/favicon-Z.png",
   "environment": "client",
   "entrypoints": {
