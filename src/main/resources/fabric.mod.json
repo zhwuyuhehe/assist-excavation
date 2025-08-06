@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "assist-excavation",
+  "version": "${version}",
+  "name": "assist-excavation",
+  "description": "辅助左键挖掘目标方块",
+  "authors": ["zhwuyuhehe"],
+  "contact": {
+    "sources": "https://github.com/zhwuyuhehe"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/assist-excavation/favicon-Z.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "top.zspaces.assistExcavation.client.AssistExcavationClient"
+    ],
+    "main": [
+      "top.zspaces.assistExcavation.AssistExcavation"
+    ],
+    "modmenu": [
+      "top.zspaces.assistExcavation.client.config.GUI.AssistExcavationModMenu"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
