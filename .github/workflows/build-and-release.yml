@@ -1,22 +1,53 @@
-name: Build-and-Release
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'   # 接收所有以 v 开头的 tag，如 v1.0.0-mc1.20.1
+      - 'v*'
+    branches:
+      - 'main'
+      - '1.20.1'
+  pull_request:
+    branches: [ main, 1.20.1 ]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: false
+        type: string
+      release_name:
+        description: 'Release name'
+        required: false
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: [main, 1.20.1]
     outputs:
-      mod_version: ${{ steps.extract.outputs.mod_version }}
-      mc_version:  ${{ steps.extract.outputs.mc_version }}
-      mod_id:      ${{ steps.extract.outputs.mod_id }}
+      main_mod_version: ${{ steps.extract_main.outputs.mod_version }}
+      main_mc_version: ${{ steps.extract_main.outputs.mc_version }}
+      main_mod_id: ${{ steps.extract_main.outputs.mod_id }}
+      mc1201_mod_version: ${{ steps.extract_1201.outputs.mod_version }}
+      mc1201_mc_version: ${{ steps.extract_1201.outputs.mc_version }}
+      mc1201_mod_id: ${{ steps.extract_1201.outputs.mod_id }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ matrix.branch }}
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -25,56 +56,144 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Build
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
         run: ./gradlew build --no-daemon --parallel
 
-      - name: Extract properties
-        id: extract
+      - name: Extract project properties for main branch
+        if: ${{ matrix.branch == 'main' }}
+        id: extract_main
         run: |
+          echo "::group::Extracting mod properties for main branch"
           MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
           MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
           MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
           echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
           echo "mc_version=$MC_VERSION"  >> $GITHUB_OUTPUT
           echo "mod_id=$MOD_ID"          >> $GITHUB_OUTPUT
+          echo "::endgroup::"
 
-      - name: Upload artifacts
+      - name: Extract project properties for 1.20.1 branch
+        if: ${{ matrix.branch == '1.20.1' }}
+        id: extract_1201
+        run: |
+          echo "::group::Extracting mod properties for 1.20.1 branch"
+          MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
+          MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION"  >> $GITHUB_OUTPUT
+          echo "mod_id=$MOD_ID"          >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+
+      - name: Rename JAR files
+        run: |
+          MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
+          MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
+          
+          for file in build/libs/*.jar; do
+            if [[ "$file" == *"-sources.jar" ]]; then
+              mv "$file" "build/libs/${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}-sources.jar"
+            else
+              mv "$file" "build/libs/${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}.jar"
+            fi
+          done
+
+      - name: Upload build artifacts for main branch
+        if: ${{ matrix.branch == 'main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: jar
-          path: build/libs/*.jar
+          name: build-artifacts-main
+          path: |
+            build/libs/*.jar
+
+      - name: Upload build artifacts for 1.20.1 branch
+        if: ${{ matrix.branch == '1.20.1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-1201
+          path: |
+            build/libs/*.jar
 
   release:
     needs: build
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-      - name: Download artifact
+      - name: Download main branch build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: jar
-          path: build/libs
+          name: build-artifacts-main
+          path: build/libs/main
 
-      - name: Determine release info
-        id: info
+      - name: Download 1.20.1 branch build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-1201
+          path: build/libs/1201
+
+      - name: Determine Release Tag & Name
+        id: vars
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          NAME="${{ needs.build.outputs.mod_id }} v${{ needs.build.outputs.mod_version }} for MC ${{ needs.build.outputs.mc_version }}"
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "name=$NAME"    >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            TAG=${{ github.event.inputs.release_tag }}
+            NAME="${{ github.event.inputs.release_name }}"
+          else
+            TAG="v${{ needs.build.outputs.main_mod_version }}+mc${{ needs.build.outputs.main_mc_version }}"
+            NAME="${{ needs.build.outputs.main_mod_id }}"
+          fi
+          echo "tag=$TAG"    >> $GITHUB_OUTPUT
+          echo "name=$NAME"  >> $GITHUB_OUTPUT
+
+      - name: Create Release Body
+        id: release_info
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          cat > release_body.md <<EOF
+          ## ${{ steps.vars.outputs.name }} Release
+          
+          Automated release created on $TIMESTAMP
+          
+          ### Included Builds
+          - Main branch (Minecraft ${{ needs.build.outputs.main_mc_version }}): ${{ needs.build.outputs.main_mod_id }}-${{ needs.build.outputs.main_mod_version }}-mc${{ needs.build.outputs.main_mc_version }}.jar
+          - 1.20.1 branch (Minecraft 1.20.1): ${{ needs.build.outputs.mc1201_mod_id }}-${{ needs.build.outputs.mc1201_mod_version }}-mc${{ needs.build.outputs.mc1201_mc_version }}.jar
+          
+          ### Release Notes
+          - Supports both Minecraft 1.20.1 and 1.21.4
+          - Fully compatible with Fabric mod loader
+          - Includes both main JAR and sources JAR for each version
+          
+          ### Installation
+          1. Download the appropriate JAR file for your Minecraft version
+          2. Place the JAR file in your Minecraft mods folder
+          3. Launch Minecraft with Fabric mod loader
+          EOF
+          echo "body_path=release_body.md" >> $GITHUB_OUTPUT
+
+      - name: Move artifacts to single directory
+        run: |
+          mkdir -p build/libs/all
+          cp build/libs/main/*.jar build/libs/all/
+          cp build/libs/1201/*.jar build/libs/all/
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.info.outputs.tag }}
-          name: ${{ steps.info.outputs.name }}
-          artifacts: build/libs/*.jar
+          tag: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.name }}
+          artifacts: build/libs/all/*.jar
+          bodyFile: ${{ steps.release_info.outputs.body_path }}
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
