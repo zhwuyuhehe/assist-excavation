@@ -4,10 +4,14 @@
   "version": "${version}",
   "name": "assist-excavation",
   "description": "辅助左键挖掘目标方块",
-  "authors": [],
-  "contact": {},
+  "authors": ["zhwuyuhehe"],
+  "contact": {
+    "sources": "https://github.com/zhwuyuhehe/assist-excavation",
+    "issues": "https://github.com/zhwuyuhehe/assist-excavation/issues",
+    "email": "zhwuyuhehe@qq.com"
+  },
   "license": "Apache-2.0",
-  "icon": "assets/assist-excavation/icon.png",
+  "icon": "assets/assist-excavation/favicon-z.png",
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -15,6 +19,9 @@
     ],
     "main": [
       "top.zspaces.assistExcavation.AssistExcavation"
+    ],
+    "modmenu": [
+      "top.zspaces.assistExcavation.client.config.GUI.AssistExcavationModMenu"
     ]
   },
   "depends": {
