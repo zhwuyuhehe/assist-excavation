@@ -176,25 +176,36 @@ jobs:
       - name: Create Release Body
         id: release_info
         run: |
-          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          # 设置北京时间
+          TIMESTAMP=$(TZ='Asia/Shanghai' date +"%Y年%m月%d日 %H:%M:%S CST")
           cat > release_body.md <<EOF
-          ## ${{ steps.vars.outputs.name }} Release
+          ## ${{ steps.vars.outputs.name }} 版本发布
           
-          Automated release created on $TIMESTAMP
+          自动化发布于 $TIMESTAMP
           
-          ### Included Builds
-          - Main branch (Minecraft ${{ needs.build.outputs.main_mc_version }}): ${{ needs.build.outputs.main_mod_id }}-${{ needs.build.outputs.main_mod_version }}-mc${{ needs.build.outputs.main_mc_version }}.jar
-          - 1.20.1 branch (Minecraft 1.20.1): ${{ needs.build.outputs.mc1201_mod_id }}-${{ needs.build.outputs.mc1201_mod_version }}-mc${{ needs.build.outputs.mc1201_mc_version }}.jar
+          ### 包含的构建版本
+          - 主分支 (Minecraft ${{ needs.build.outputs.main_mc_version }}): ${{ needs.build.outputs.main_mod_id }}-${{ needs.build.outputs.main_mod_version }}-mc${{ needs.build.outputs.main_mc_version }}.jar
+          - 1.20.1 分支 (Minecraft 1.20.1): ${{ needs.build.outputs.mc1201_mod_id }}-${{ needs.build.outputs.mc1201_mod_version }}-mc${{ needs.build.outputs.mc1201_mc_version }}.jar
           
-          ### Release Notes
-          - Supports both Minecraft 1.20.1 and 1.21.4
-          - Fully compatible with Fabric mod loader
-          - Includes both main JAR and sources JAR for each version
+          ### 版本说明
+          - 支持 Minecraft 1.20.1 和 1.21.4 两个版本
+          - 完全兼容 Fabric 模组加载器
+          - 每个版本均包含主 JAR 文件和源码 JAR 文件
           
-          ### Installation
-          1. Download the appropriate JAR file for your Minecraft version
-          2. Place the JAR file in your Minecraft mods folder
-          3. Launch Minecraft with Fabric mod loader
+          ### 安装说明
+          1. 根据您的 Minecraft 版本选择对应的 JAR 文件下载
+          2. 将下载的 JAR 文件放入 Minecraft 的 mods 文件夹中
+          3. 启动 Minecraft 并使用 Fabric 模组加载器运行游戏
+          
+          ### 使用方法
+          - 按 **Z** 键切换挖掘辅助功能的开启/关闭状态
+          - 按 **V** 键打开配置界面，可自定义挖掘范围、延迟等参数
+          
+          ### 功能特性
+          - 智能范围挖掘：支持矩形和圆形两种挖掘模式
+          - 可配置延迟：可根据需要调整挖掘速度（0-40 刻）
+          - 多语言支持：内置中文和英文界面
+          - 快捷键自定义：支持自定义功能键位
           EOF
           echo "body_path=release_body.md" >> $GITHUB_OUTPUT
 
