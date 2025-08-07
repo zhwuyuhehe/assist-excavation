@@ -1,18 +1,51 @@
-name: Build-and-Release
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-mc*'     # 自动响应形如 v1.2.3-mc1.20.1 的 tag
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # … Build 步骤保持不变 …
+    outputs:
+      mod_version: ${{ steps.extract.outputs.mod_version }}
+      mc_version:  ${{ steps.extract.outputs.mc_version }}
+      mod_id:      ${{ steps.extract.outputs.mod_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Build
+        run: ./gradlew build --no-daemon --parallel
+
+      - name: Extract properties
+        id: extract
+        run: |
+          MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
+          MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION"  >> $GITHUB_OUTPUT
+          echo "mod_id=$MOD_ID"          >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar
+          path: build/libs/*.jar
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +55,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
           name: jar
           path: build/libs
@@ -30,18 +64,17 @@ jobs:
       - name: Determine release info
         id: info
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}      # v1.2.3 or v1.2.3+mc1.20.1
-          MOD_ID="${{ needs.build.outputs.mod_id }}"
-          # 你也可拆分 TAG_NAME 提取子串，此处直接用全称
-          NAME="${MOD_ID} ${TAG_NAME}"
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          # 拼成 "assist-excavation v1.0.0 for MC 1.20.1"
+          NAME="${{ needs.build.outputs.mod_id }} v${{ needs.build.outputs.mod_version }} for MC ${{ needs.build.outputs.mc_version }}"
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "name=$NAME"     >> $GITHUB_OUTPUT
+          echo "name=$NAME"    >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag:   ${{ steps.info.outputs.tag }}
-          name:  ${{ steps.info.outputs.name }}
+          tag: ${{ steps.info.outputs.tag }}
+          name: ${{ steps.info.outputs.name }}
           files: build/libs/*.jar
           draft: false
           prerelease: false
