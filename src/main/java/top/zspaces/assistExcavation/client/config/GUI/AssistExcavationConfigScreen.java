@@ -2,10 +2,10 @@ package top.zspaces.assistExcavation.client.config.GUI;
 
 import net.fabricmc.api.Environment;
 import net.fabricmc.api.EnvType;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.text.Text;
 import net.minecraft.text.MutableText;
 import top.zspaces.assistExcavation.client.Common;
@@ -149,7 +149,7 @@ public class AssistExcavationConfigScreen extends Screen {
     
     @Override
     public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
+        this.renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
         
         // 绘制标题
@@ -159,7 +159,10 @@ public class AssistExcavationConfigScreen extends Screen {
         
         // 显示服务器实际可达距离信息
         if (this.client != null && this.client.player != null) {
-            double realReach = this.client.player.getAttributeValue(EntityAttributes.BLOCK_INTERACTION_RANGE);
+            double realReach = 0;
+            if (MinecraftClient.getInstance().interactionManager != null) {
+                realReach = MinecraftClient.getInstance().interactionManager.getReachDistance();
+            }
             context.drawCenteredTextWithShadow(this.textRenderer,
                     Text.translatable("screen.assist-excavation.config.real_reach", String.format("%.2f", realReach)),
                     this.width / 2, this.height - 85, 0xAAAAAA);
