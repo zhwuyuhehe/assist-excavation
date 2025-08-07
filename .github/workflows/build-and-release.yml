@@ -1,9 +1,9 @@
-name: Build and Release
+name: Build-and-Release
 
 on:
   push:
     tags:
-      - 'v*-mc*'     # 自动响应形如 v1.2.3-mc1.20.1 的 tag
+      - 'v*'   # 接收所有以 v 开头的 tag，如 v1.0.0-mc1.20.1
 
 jobs:
   build:
@@ -65,7 +65,6 @@ jobs:
         id: info
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          # 拼成 "assist-excavation v1.0.0 for MC 1.20.1"
           NAME="${{ needs.build.outputs.mod_id }} v${{ needs.build.outputs.mod_version }} for MC ${{ needs.build.outputs.mc_version }}"
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "name=$NAME"    >> $GITHUB_OUTPUT
