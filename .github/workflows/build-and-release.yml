@@ -2,10 +2,15 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - main
+      - 1.20.1
     tags:
       - 'v*'
   pull_request:
-    branches: [ 1.20.1, main ]
+    branches:
+      - main
+      - 1.20.1
   workflow_dispatch:
     inputs:
       release_tag:
@@ -19,15 +24,19 @@ on:
 
 jobs:
   build:
+    name: Build (${{ github.ref_name }})
     runs-on: ubuntu-latest
     outputs:
       mod_version: ${{ steps.extract.outputs.mod_version }}
-      mc_version: ${{ steps.extract.outputs.mc_version }}
-      mod_id: ${{ steps.extract.outputs.mod_id }}
+      mc_version:  ${{ steps.extract.outputs.mc_version }}
+      mod_id:      ${{ steps.extract.outputs.mod_id }}
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # 拉取所有分支和 tags，确保 tag push 可识别
+          ref: ${{ github.ref }}
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v3
@@ -44,7 +53,7 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Grant execute permission for gradlew
+      - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Build with Gradle
@@ -53,27 +62,25 @@ jobs:
       - name: Extract project properties
         id: extract
         run: |
-          echo "::group::Extracting mod properties"
           MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
           MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
           MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
           echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
           echo "mc_version=$MC_VERSION"  >> $GITHUB_OUTPUT
           echo "mod_id=$MOD_ID"          >> $GITHUB_OUTPUT
-          echo "::endgroup::"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: |
-            build/libs/*.jar
+          name: build-artifacts-${{ github.ref_name }}
+          path: build/libs/*.jar
 
   release:
+    name: Release
     needs: build
     if: |
       github.event_name == 'workflow_dispatch' ||
-      startsWith(github.ref, 'refs/tags/v')
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -81,11 +88,14 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts
+          name: build-artifacts-${{ github.ref_name }}
           path: build/libs
 
       - name: Determine Release Tag & Name
@@ -98,8 +108,8 @@ jobs:
             TAG="v${{ needs.build.outputs.mod_version }}+mc${{ needs.build.outputs.mc_version }}"
             NAME="${{ needs.build.outputs.mod_id }}"
           fi
-          echo "tag=$TAG"    >> $GITHUB_OUTPUT
-          echo "name=$NAME"  >> $GITHUB_OUTPUT
+          echo "tag=$TAG"   >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
