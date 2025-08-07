@@ -5,7 +5,7 @@ on:
     tags:
       - 'v*'
   pull_request:
-    branches: [ master, main ]
+    branches: [ 1.20.1, main ]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -20,24 +20,47 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      mod_version: ${{ steps.extract.outputs.mod_version }}
+      mc_version: ${{ steps.extract.outputs.mc_version }}
+      mod_id: ${{ steps.extract.outputs.mod_id }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: 21
           distribution: temurin
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+          java-version: 17
+          cache: gradle
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+        run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build --no-daemon --parallel
+
+      - name: Extract project properties
+        id: extract
+        run: |
+          echo "::group::Extracting mod properties"
+          MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
+          MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION"  >> $GITHUB_OUTPUT
+          echo "mod_id=$MOD_ID"          >> $GITHUB_OUTPUT
+          echo "::endgroup::"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -45,84 +68,45 @@ jobs:
           name: build-artifacts
           path: |
             build/libs/*.jar
-            !build/libs/*-sources.jar
-            !build/libs/*-dev.jar
-
-      - name: Upload sources artifact
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: sources-artifact
-          path: build/libs/*-sources.jar
 
   release:
     needs: build
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: build/libs/
-          merge-multiple: true
+          name: build-artifacts
+          path: build/libs
 
-      - name: Display structure of downloaded files
-        run: ls -la build/libs/
-
-      - name: Extract project properties
-        id: properties
-        run: |
-          # Extract mod version from gradle.properties
-          MOD_VERSION=$(grep "mod_version=" gradle.properties | cut -d'=' -f2)
-          MC_VERSION=$(grep "minecraft_version=" gradle.properties | cut -d'=' -f2)
-          MOD_ID=$(grep -A2 '"id":' src/main/resources/fabric.mod.json | tail -n1 | sed 's/[", ]//g')
-          
-          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
-          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
-          echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
-
-      - name: Set release variables
+      - name: Determine Release Tag & Name
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.release_tag }}" != "" ]; then
-            echo "tag=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
-            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            TAG=${{ github.event.inputs.release_tag }}
+            NAME="${{ github.event.inputs.release_name }}"
           else
-            echo "tag=v${{ steps.properties.outputs.mod_version }}+mc${{ steps.properties.outputs.mc_version }}" >> $GITHUB_OUTPUT
-            echo "name=${{ steps.properties.outputs.mod_id }}" >> $GITHUB_OUTPUT
+            TAG="v${{ needs.build.outputs.mod_version }}+mc${{ needs.build.outputs.mc_version }}"
+            NAME="${{ needs.build.outputs.mod_id }}"
           fi
+          echo "tag=$TAG"    >> $GITHUB_OUTPUT
+          echo "name=$NAME"  >> $GITHUB_OUTPUT
 
-      - name: Create Release
-        id: create_release
+      - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.vars.outputs.tag }}
           name: ${{ steps.vars.outputs.name }}
+          files: build/libs/*.jar
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Assets
-        run: |
-          cd build/libs/
-          
-          # Upload main JAR file
-          MAIN_JAR=$(ls *.jar | grep -v sources | grep -v dev | head -n 1)
-          if [ -f "$MAIN_JAR" ]; then
-            echo "Uploading main JAR: $MAIN_JAR"
-            gh release upload ${{ steps.vars.outputs.tag }} "$MAIN_JAR" --repo ${{ github.repository }}
-          fi
-          
-          # Upload sources JAR file if exists
-          SOURCES_JAR=$(ls *-sources.jar 2>/dev/null || echo "")
-          if [ -n "$SOURCES_JAR" ]; then
-            echo "Uploading sources JAR: $SOURCES_JAR"
-            gh release upload ${{ steps.vars.outputs.tag }} "$SOURCES_JAR" --repo ${{ github.repository }}
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
