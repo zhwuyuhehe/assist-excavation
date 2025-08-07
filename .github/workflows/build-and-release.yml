@@ -1,0 +1,128 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: false
+        type: string
+      release_name:
+        description: 'Release name'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-dev.jar
+
+      - name: Upload sources artifact
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sources-artifact
+          path: build/libs/*-sources.jar
+
+  release:
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build/libs/
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -la build/libs/
+
+      - name: Extract project properties
+        id: properties
+        run: |
+          # Extract mod version from gradle.properties
+          MOD_VERSION=$(grep "mod_version=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "minecraft_version=" gradle.properties | cut -d'=' -f2)
+          MOD_ID=$(grep -A2 '"id":' src/main/resources/fabric.mod.json | tail -n1 | sed 's/[", ]//g')
+          
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+          echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
+
+      - name: Set release variables
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.release_tag }}" != "" ]; then
+            echo "tag=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v${{ steps.properties.outputs.mod_version }}+mc${{ steps.properties.outputs.mc_version }}" >> $GITHUB_OUTPUT
+            echo "name=${{ steps.properties.outputs.mod_id }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.name }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets
+        run: |
+          cd build/libs/
+          
+          # Upload main JAR file
+          MAIN_JAR=$(ls *.jar | grep -v sources | grep -v dev | head -n 1)
+          if [ -f "$MAIN_JAR" ]; then
+            echo "Uploading main JAR: $MAIN_JAR"
+            gh release upload ${{ steps.vars.outputs.tag }} "$MAIN_JAR" --repo ${{ github.repository }}
+          fi
+          
+          # Upload sources JAR file if exists
+          SOURCES_JAR=$(ls *-sources.jar 2>/dev/null || echo "")
+          if [ -n "$SOURCES_JAR" ]; then
+            echo "Uploading sources JAR: $SOURCES_JAR"
+            gh release upload ${{ steps.vars.outputs.tag }} "$SOURCES_JAR" --repo ${{ github.repository }}
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

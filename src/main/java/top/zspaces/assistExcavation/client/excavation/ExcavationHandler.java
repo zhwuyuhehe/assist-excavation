@@ -6,6 +6,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -155,10 +156,7 @@ public class ExcavationHandler {
      */
     private static boolean isWithinServerReach(BlockPos target, ClientPlayerEntity player) {
         // 获取服务器允许的真实挖掘距离
-        double realReach = 0;
-        if (MinecraftClient.getInstance().interactionManager != null) {
-            realReach = MinecraftClient.getInstance().interactionManager.getReachDistance();
-        }
+        double realReach = player.getAttributeValue(EntityAttributes.BLOCK_INTERACTION_RANGE);
         double dx = target.getX() + 0.5 - player.getX();
         double dy = target.getY() + 0.5 - (player.getY() + player.getStandingEyeHeight());
         double dz = target.getZ() + 0.5 - player.getZ();
