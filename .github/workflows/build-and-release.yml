@@ -106,7 +106,7 @@ jobs:
         with:
           tag: ${{ steps.vars.outputs.tag }}
           name: ${{ steps.vars.outputs.name }}
-          files: build/libs/*.jar
+          artifacts: build/libs/*.jar
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
