@@ -94,29 +94,39 @@ jobs:
           MC_VERSION=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
           MOD_ID=$(jq -r '.id' src/main/resources/fabric.mod.json)
           
+          echo "Renaming JAR files for ${{ matrix.branch }} branch"
+          echo "MOD_ID: $MOD_ID"
+          echo "MOD_VERSION: $MOD_VERSION" 
+          echo "MC_VERSION: $MC_VERSION"
+          
           for file in build/libs/*.jar; do
             if [[ "$file" == *"-sources.jar" ]]; then
-              mv "$file" "build/libs/${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}-sources.jar"
+              new_name="${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}-sources.jar"
+              echo "Renaming sources JAR: $file -> build/libs/$new_name"
+              mv "$file" "build/libs/$new_name"
             else
-              mv "$file" "build/libs/${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}.jar"
+              new_name="${MOD_ID}-${MOD_VERSION}-mc${MC_VERSION}.jar"
+              echo "Renaming main JAR: $file -> build/libs/$new_name"
+              mv "$file" "build/libs/$new_name"
             fi
           done
+          
+          echo "Files in build/libs after renaming:"
+          ls -la build/libs/
 
       - name: Upload build artifacts for main branch
         if: ${{ matrix.branch == 'main' }}
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-main
-          path: |
-            build/libs/*.jar
+          path: build/libs/*.jar
 
       - name: Upload build artifacts for 1.20.1 branch
         if: ${{ matrix.branch == '1.20.1' }}
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-1201
-          path: |
-            build/libs/*.jar
+          path: build/libs/*.jar
 
   release:
     needs: build
@@ -142,6 +152,13 @@ jobs:
         with:
           name: build-artifacts-1201
           path: build/libs/1201
+
+      - name: List downloaded files
+        run: |
+          echo "Files in build/libs/main:"
+          ls -la build/libs/main/
+          echo "Files in build/libs/1201:"
+          ls -la build/libs/1201/
 
       - name: Determine Release Tag & Name
         id: vars
@@ -186,6 +203,8 @@ jobs:
           mkdir -p build/libs/all
           cp build/libs/main/*.jar build/libs/all/
           cp build/libs/1201/*.jar build/libs/all/
+          echo "Files in build/libs/all (to be released):"
+          ls -la build/libs/all/
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
