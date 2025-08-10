@@ -13,5 +13,6 @@
   "screen.assist-excavation.config.reach": "挖掘范围: %d",
   "screen.assist-excavation.config.reset": "重置为默认",
   "screen.assist-excavation.config.title": "辅助挖掘配置",
-  "screen.assist-excavation.config.real_reach": "服务器或游戏规则的设定实际可到达的手长为：%f"
+  "screen.assist-excavation.config.real_reach": "服务器或游戏规则的设定实际可到达的手长为：%f",
+  "modmenu.descriptionTranslation.assist-excavation": "一个客户端实用模组，帮助玩家高效挖掘相邻方块。使挖掘大面积区域变得更加容易。它遵守服务器规则，不会在多人游戏中提供不公平的优势。"
 }

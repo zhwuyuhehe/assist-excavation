@@ -13,5 +13,6 @@
   "screen.assist-excavation.config.reach": "Reach: %d",
   "screen.assist-excavation.config.reset": "Reset to Default",
   "screen.assist-excavation.config.title": "Assist Excavation Configuration",
-  "screen.assist-excavation.config.real_reach": "Game Rule`s Real Reach %f"
+  "screen.assist-excavation.config.real_reach": "Game Rule's Real Reach %f",
+  "modmenu.descriptionTranslation.assist-excavation": "A client-side utility mod that helps players efficiently mine adjacent blocks. This mod automatically targets nearby blocks of the same type when mining, making it easier to excavate large areas. It respects server rules and does not provide unfair advantages in multiplayer games."
 }

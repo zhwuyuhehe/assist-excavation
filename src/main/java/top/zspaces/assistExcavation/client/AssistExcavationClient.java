@@ -19,7 +19,8 @@ public class AssistExcavationClient implements ClientModInitializer {
         // 注册客户端tick事件来处理挖掘逻辑
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         
-        LOGGER.info("辅助挖掘启动完毕！");
+        LOGGER.info("Assist Excavation mod initialized - Enhancing your mining experience while respecting server rules");
+        LOGGER.info("辅助挖掘模组加载完毕。");
     }
 
     /**
