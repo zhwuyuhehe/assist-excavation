@@ -1,6 +1,6 @@
 # Assist Excavation
 
-Assist Excavation is a client-side Fabric mod for Minecraft that enhances the block mining experience by automatically targeting adjacent blocks of the same type. This utility mod makes it easier and more efficient to excavate large areas without providing any unfair advantages in multiplayer games.
+Assist Excavation is a client-side Fabric mod for Minecraft that enhances the block mining experience by automatically targeting adjacent blocks. This utility mod makes it easier and more efficient to excavate large areas without providing any unfair advantages in multiplayer games. However, there is still a possibility that the server may identify it as cheating.
 
 [中文描述文档](README-zh_cn.md)
 
