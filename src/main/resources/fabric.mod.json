@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "assist-excavation",
   "version": "${version}",
-  "name": "assist-excavation",
-  "description": "辅助左键挖掘目标方块",
+  "name": "Assist Excavation",
+  "description": "A client-side utility mod that helps players efficiently mine adjacent blocks by automatically targeting nearby blocks when mining. This mod enhances the excavation experience without providing unfair advantages in multiplayer settings.",
   "authors": ["zhwuyuhehe"],
   "contact": {
     "sources": "https://github.com/zhwuyuhehe/assist-excavation",
@@ -11,7 +11,7 @@
     "email": "zhwuyuhehe@qq.com"
   },
   "license": "Apache-2.0",
-  "icon": "assets/assist-excavation/favicon-z.png",
+  "icon": "assets/assist-excavation/favicon-Z.png",
   "environment": "client",
   "entrypoints": {
     "client": [
